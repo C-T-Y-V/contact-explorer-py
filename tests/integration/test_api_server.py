@@ -6,13 +6,11 @@ import json
 import threading
 from http.server import ThreadingHTTPServer
 from pathlib import Path
-from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import pytest
 
 from contact_explorer.api import ContactExplorerHandler
-from contact_explorer.models import ContactDraft, PhoneNumber
 from contact_explorer.service import ContactService
 
 

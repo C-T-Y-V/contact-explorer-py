@@ -78,7 +78,9 @@ def test_contact_model_properties_and_serialization() -> None:
 
 
 def test_folder_model_serialization() -> None:
-    folder = Folder(id="f-1", name="Engineering", parent_folder_id=None, created_at=1000, contact_count=5)
+    folder = Folder(
+        id="f-1", name="Engineering", parent_folder_id=None, created_at=1000, contact_count=5
+    )
     data = folder.to_dict()
     assert data == {
         "id": "f-1",

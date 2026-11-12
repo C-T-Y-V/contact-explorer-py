@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from . import intelligence, transfer
 from .database import Database
@@ -22,7 +23,6 @@ from .models import (
     new_id,
     now_ms,
 )
-
 
 TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 DEFAULT_GROUPS = ("Classmates", "Hostelmates", "Family", "Friends")
@@ -105,7 +105,11 @@ class ContactService:
             note=str(payload.get("note", payload.get("notes", ""))).strip(),
             groups=[str(item).strip() for item in groups or [] if str(item).strip()],
             tags=[str(item).strip() for item in tags or [] if str(item).strip()],
-            is_favorite=as_bool(payload.get("is_favorite", payload.get("isFavorite", payload.get("favorite", False)))),
+            is_favorite=as_bool(
+                payload.get(
+                    "is_favorite", payload.get("isFavorite", payload.get("favorite", False))
+                )
+            ),
             photo_uri=payload.get("photo_uri"),
         )
 
@@ -185,16 +189,20 @@ class ContactService:
         row = conn.execute("SELECT * FROM contacts WHERE id = ?", (str(contact_id),)).fetchone()
         return self._row_to_contact(conn, row) if row else None
 
-    def _group_id_locked(self, conn: sqlite3.Connection, value: str, create: bool = True) -> str | None:
+    def _group_id_locked(
+        self, conn: sqlite3.Connection, value: str, create: bool = True
+    ) -> str | None:
         value = str(value).strip()
         if not value:
             return None
         row = conn.execute("SELECT id FROM folders WHERE id = ?", (value,)).fetchone()
         if row:
-            return row["id"]
-        row = conn.execute("SELECT id FROM folders WHERE name = ? COLLATE NOCASE", (value,)).fetchone()
+            return str(row["id"])
+        row = conn.execute(
+            "SELECT id FROM folders WHERE name = ? COLLATE NOCASE", (value,)
+        ).fetchone()
         if row:
-            return row["id"]
+            return str(row["id"])
         if not create:
             return None
         group_id = new_id("group-")
@@ -204,16 +212,18 @@ class ContactService:
         )
         return group_id
 
-    def _tag_id_locked(self, conn: sqlite3.Connection, value: str, create: bool = True) -> str | None:
+    def _tag_id_locked(
+        self, conn: sqlite3.Connection, value: str, create: bool = True
+    ) -> str | None:
         value = str(value).strip()
         if not value:
             return None
         row = conn.execute("SELECT id FROM tags WHERE id = ?", (value,)).fetchone()
         if row:
-            return row["id"]
+            return str(row["id"])
         row = conn.execute("SELECT id FROM tags WHERE name = ? COLLATE NOCASE", (value,)).fetchone()
         if row:
-            return row["id"]
+            return str(row["id"])
         if not create:
             return None
         tag_id = new_id("tag-")
@@ -250,11 +260,17 @@ class ContactService:
 
     def list_contacts(self) -> list[Contact]:
         with self.db.lock:
-            rows = self.db.connection.execute("SELECT * FROM contacts ORDER BY name COLLATE NOCASE").fetchall()
+            rows = self.db.connection.execute(
+                "SELECT * FROM contacts ORDER BY name COLLATE NOCASE"
+            ).fetchall()
             return [self._row_to_contact(self.db.connection, row) for row in rows]
 
-    def search_contacts(self, query: str, contacts: Iterable[Contact] | None = None) -> list[Contact]:
-        return intelligence.search_contacts(contacts if contacts is not None else self.list_contacts(), query)
+    def search_contacts(
+        self, query: str, contacts: Iterable[Contact] | None = None
+    ) -> list[Contact]:
+        return intelligence.search_contacts(
+            contacts if contacts is not None else self.list_contacts(), query
+        )
 
     def _save_contact_locked(
         self,
@@ -286,7 +302,9 @@ class ContactService:
             )
             event_action = "CREATED"
         else:
-            existing = conn.execute("SELECT id FROM contacts WHERE id = ?", (str(contact_id),)).fetchone()
+            existing = conn.execute(
+                "SELECT id FROM contacts WHERE id = ?", (str(contact_id),)
+            ).fetchone()
             if not existing:
                 contact_id = new_id("contact-")
                 timestamp = now_ms()
@@ -349,13 +367,21 @@ class ContactService:
         for value in draft.groups:
             group_id = self._group_id_locked(conn, value)
             if group_id:
-                conn.execute("INSERT OR IGNORE INTO contact_groups(contact_id, group_id) VALUES (?, ?)", (contact_id, group_id))
+                conn.execute(
+                    "INSERT OR IGNORE INTO contact_groups(contact_id, group_id) VALUES (?, ?)",
+                    (contact_id, group_id),
+                )
         for value in draft.tags:
             tag_id = self._tag_id_locked(conn, value)
             if tag_id:
-                conn.execute("INSERT OR IGNORE INTO contact_tags(contact_id, tag_id) VALUES (?, ?)", (contact_id, tag_id))
+                conn.execute(
+                    "INSERT OR IGNORE INTO contact_tags(contact_id, tag_id) VALUES (?, ?)",
+                    (contact_id, tag_id),
+                )
         if record_event:
-            self._record_event_locked(conn, contact_id, draft.name.strip(), event_action, "Contact details saved.")
+            self._record_event_locked(
+                conn, contact_id, draft.name.strip(), event_action, "Contact details saved."
+            )
         return contact_id
 
     def save_contact(self, contact_id: str | None, draft: ContactDraft | dict[str, Any]) -> Contact:
@@ -376,10 +402,17 @@ class ContactService:
                 if not contact:
                     continue
                 if move_to_trash:
-                    snapshot = self._contact_to_dict(contact, self._folder_ids_locked(conn, contact_id))
+                    snapshot = self._contact_to_dict(
+                        contact, self._folder_ids_locked(conn, contact_id)
+                    )
                     conn.execute(
                         "INSERT OR REPLACE INTO deleted_contacts(contact_id, name, deleted_at, snapshot_json) VALUES (?, ?, ?, ?)",
-                        (contact_id, contact.name, now_ms(), json.dumps(snapshot, ensure_ascii=False)),
+                        (
+                            contact_id,
+                            contact.name,
+                            now_ms(),
+                            json.dumps(snapshot, ensure_ascii=False),
+                        ),
                     )
                 conn.execute("DELETE FROM contacts WHERE id = ?", (contact_id,))
                 self._record_event_locked(
@@ -394,17 +427,26 @@ class ContactService:
 
     def toggle_favorite(self, contact_id: str) -> bool:
         with self.db.transaction() as conn:
-            row = conn.execute("SELECT name, is_favorite FROM contacts WHERE id = ?", (str(contact_id),)).fetchone()
+            row = conn.execute(
+                "SELECT name, is_favorite FROM contacts WHERE id = ?", (str(contact_id),)
+            ).fetchone()
             if not row:
                 raise ValueError("Contact not found")
             value = not bool(row["is_favorite"])
-            conn.execute("UPDATE contacts SET is_favorite = ?, updated_at = ? WHERE id = ?", (int(value), now_ms(), str(contact_id)))
-            self._record_event_locked(conn, str(contact_id), row["name"], "FAVORITE", "Favorite status changed.")
+            conn.execute(
+                "UPDATE contacts SET is_favorite = ?, updated_at = ? WHERE id = ?",
+                (int(value), now_ms(), str(contact_id)),
+            )
+            self._record_event_locked(
+                conn, str(contact_id), row["name"], "FAVORITE", "Favorite status changed."
+            )
             return value
 
     def record_viewed(self, contact_id: str) -> None:
         with self.db.transaction() as conn:
-            row = conn.execute("SELECT name FROM contacts WHERE id = ?", (str(contact_id),)).fetchone()
+            row = conn.execute(
+                "SELECT name FROM contacts WHERE id = ?", (str(contact_id),)
+            ).fetchone()
             if not row:
                 return
             timestamp = now_ms()
@@ -413,11 +455,15 @@ class ContactService:
                 "ON CONFLICT(contact_id) DO UPDATE SET viewed_at = excluded.viewed_at",
                 (str(contact_id), timestamp),
             )
-            self._record_event_locked(conn, str(contact_id), row["name"], "OPENED", "Contact viewed.")
+            self._record_event_locked(
+                conn, str(contact_id), row["name"], "OPENED", "Contact viewed."
+            )
 
     def record_call(self, contact_id: str) -> None:
         with self.db.transaction() as conn:
-            row = conn.execute("SELECT name FROM contacts WHERE id = ?", (str(contact_id),)).fetchone()
+            row = conn.execute(
+                "SELECT name FROM contacts WHERE id = ?", (str(contact_id),)
+            ).fetchone()
             if not row:
                 return
             timestamp = now_ms()
@@ -430,14 +476,20 @@ class ContactService:
                 "ON CONFLICT(contact_id) DO UPDATE SET viewed_at = excluded.viewed_at",
                 (str(contact_id), timestamp),
             )
-            self._record_event_locked(conn, str(contact_id), row["name"], "CALLED", "Call action started.")
+            self._record_event_locked(
+                conn, str(contact_id), row["name"], "CALLED", "Call action started."
+            )
 
     def record_share(self, contact_ids: Iterable[str]) -> None:
         with self.db.transaction() as conn:
             for contact_id in contact_ids:
-                row = conn.execute("SELECT name FROM contacts WHERE id = ?", (str(contact_id),)).fetchone()
+                row = conn.execute(
+                    "SELECT name FROM contacts WHERE id = ?", (str(contact_id),)
+                ).fetchone()
                 if row:
-                    self._record_event_locked(conn, str(contact_id), row["name"], "SHARED", "Contact shared.")
+                    self._record_event_locked(
+                        conn, str(contact_id), row["name"], "SHARED", "Contact shared."
+                    )
 
     # ── Groups and tags ─────────────────────────────────────────────────
 
@@ -468,9 +520,16 @@ class ContactService:
         if not clean:
             raise ValueError("Group name is required")
         with self.db.transaction() as conn:
-            if parent_folder_id and not conn.execute("SELECT 1 FROM folders WHERE id = ?", (parent_folder_id,)).fetchone():
+            if (
+                parent_folder_id
+                and not conn.execute(
+                    "SELECT 1 FROM folders WHERE id = ?", (parent_folder_id,)
+                ).fetchone()
+            ):
                 parent_folder_id = None
-            existing = conn.execute("SELECT id FROM folders WHERE name = ? COLLATE NOCASE", (clean,)).fetchone()
+            existing = conn.execute(
+                "SELECT id FROM folders WHERE name = ? COLLATE NOCASE", (clean,)
+            ).fetchone()
             if existing:
                 raise ValueError("A group with this name already exists")
             group_id = new_id("group-")
@@ -487,7 +546,9 @@ class ContactService:
         if not clean:
             raise ValueError("Group name is required")
         with self.db.transaction() as conn:
-            current = conn.execute("SELECT * FROM folders WHERE id = ?", (str(group_id),)).fetchone()
+            current = conn.execute(
+                "SELECT * FROM folders WHERE id = ?", (str(group_id),)
+            ).fetchone()
             if not current:
                 raise ValueError("Group not found")
             duplicate = conn.execute(
@@ -504,27 +565,42 @@ class ContactService:
                 "LEFT JOIN contact_groups cg ON cg.group_id = f.id WHERE f.id = ? GROUP BY f.id",
                 (str(group_id),),
             ).fetchone()
-            return Folder(row["id"], row["name"], row["parent_folder_id"], row["created_at"], row["contact_count"])
+            return Folder(
+                row["id"],
+                row["name"],
+                row["parent_folder_id"],
+                row["created_at"],
+                row["contact_count"],
+            )
 
     def delete_group(self, group_id: str) -> bool:
         with self.db.transaction() as conn:
             row = conn.execute("SELECT name FROM folders WHERE id = ?", (str(group_id),)).fetchone()
             if not row:
                 return False
-            conn.execute("UPDATE folders SET parent_folder_id = NULL WHERE parent_folder_id = ?", (str(group_id),))
+            conn.execute(
+                "UPDATE folders SET parent_folder_id = NULL WHERE parent_folder_id = ?",
+                (str(group_id),),
+            )
             conn.execute("DELETE FROM folders WHERE id = ?", (str(group_id),))
-            self._record_event_locked(conn, None, row["name"], "GROUP_DELETED", "Contact group deleted.")
+            self._record_event_locked(
+                conn, None, row["name"], "GROUP_DELETED", "Contact group deleted."
+            )
             return True
 
     def merge_groups(self, target_group_id: str, source_group_ids: Iterable[str]) -> int:
         sources = [str(item) for item in source_group_ids if str(item) != str(target_group_id)]
         with self.db.transaction() as conn:
-            target = conn.execute("SELECT name FROM folders WHERE id = ?", (str(target_group_id),)).fetchone()
+            target = conn.execute(
+                "SELECT name FROM folders WHERE id = ?", (str(target_group_id),)
+            ).fetchone()
             if not target:
                 raise ValueError("Target group not found")
             moved = 0
             for source_id in sources:
-                rows = conn.execute("SELECT contact_id FROM contact_groups WHERE group_id = ?", (source_id,)).fetchall()
+                rows = conn.execute(
+                    "SELECT contact_id FROM contact_groups WHERE group_id = ?", (source_id,)
+                ).fetchall()
                 for row in rows:
                     conn.execute(
                         "INSERT OR IGNORE INTO contact_groups(contact_id, group_id) VALUES (?, ?)",
@@ -533,7 +609,9 @@ class ContactService:
                     moved += 1
                 conn.execute("DELETE FROM folders WHERE id = ?", (source_id,))
             if sources:
-                self._record_event_locked(conn, None, target["name"], "MERGED_GROUPS", f"Merged {len(sources)} group(s).")
+                self._record_event_locked(
+                    conn, None, target["name"], "MERGED_GROUPS", f"Merged {len(sources)} group(s)."
+                )
             return moved
 
     def contacts_in_group(self, group_id: str) -> list[Contact]:
@@ -553,23 +631,39 @@ class ContactService:
             ).fetchall()
             return [self._row_to_contact(self.db.connection, row) for row in rows]
 
-    def assign_groups(self, contact_ids: Iterable[str], group_ids: Iterable[str], replace: bool = True) -> None:
+    def assign_groups(
+        self, contact_ids: Iterable[str], group_ids: Iterable[str], replace: bool = True
+    ) -> None:
         contact_ids = [str(item) for item in dict.fromkeys(contact_ids)]
         group_ids = [str(item) for item in dict.fromkeys(group_ids)]
         with self.db.transaction() as conn:
-            valid_groups = {
-                row["id"]
-                for row in conn.execute(
-                    f"SELECT id FROM folders WHERE id IN ({','.join('?' for _ in group_ids)})", group_ids
-                )
-            } if group_ids else set()
+            valid_groups = (
+                {
+                    row["id"]
+                    for row in conn.execute(
+                        f"SELECT id FROM folders WHERE id IN ({','.join('?' for _ in group_ids)})",
+                        group_ids,
+                    )
+                }
+                if group_ids
+                else set()
+            )
             for contact_id in contact_ids:
                 if replace:
                     conn.execute("DELETE FROM contact_groups WHERE contact_id = ?", (contact_id,))
                 for group_id in valid_groups:
-                    conn.execute("INSERT OR IGNORE INTO contact_groups(contact_id, group_id) VALUES (?, ?)", (contact_id, group_id))
+                    conn.execute(
+                        "INSERT OR IGNORE INTO contact_groups(contact_id, group_id) VALUES (?, ?)",
+                        (contact_id, group_id),
+                    )
             if contact_ids:
-                self._record_event_locked(conn, None, "Contacts", "GROUPED", f"Updated groups for {len(contact_ids)} contact(s).")
+                self._record_event_locked(
+                    conn,
+                    None,
+                    "Contacts",
+                    "GROUPED",
+                    f"Updated groups for {len(contact_ids)} contact(s).",
+                )
 
     def list_tags(self) -> list[Tag]:
         with self.db.lock:
@@ -585,7 +679,9 @@ class ContactService:
         if not clean:
             raise ValueError("Tag name is required")
         with self.db.transaction() as conn:
-            existing = conn.execute("SELECT id, name FROM tags WHERE name = ? COLLATE NOCASE", (clean,)).fetchone()
+            existing = conn.execute(
+                "SELECT id, name FROM tags WHERE name = ? COLLATE NOCASE", (clean,)
+            ).fetchone()
             if existing:
                 return Tag(existing["id"], existing["name"], 0)
             tag_id = new_id("tag-")
@@ -599,10 +695,14 @@ class ContactService:
             if not row:
                 return False
             conn.execute("DELETE FROM tags WHERE id = ?", (str(tag_id),))
-            self._record_event_locked(conn, None, row["name"], "TAG_DELETED", "Contact tag deleted.")
+            self._record_event_locked(
+                conn, None, row["name"], "TAG_DELETED", "Contact tag deleted."
+            )
             return True
 
-    def assign_tags(self, contact_ids: Iterable[str], tag_ids: Iterable[str], replace: bool = False) -> None:
+    def assign_tags(
+        self, contact_ids: Iterable[str], tag_ids: Iterable[str], replace: bool = False
+    ) -> None:
         contact_ids = [str(item) for item in dict.fromkeys(contact_ids)]
         tag_ids = [str(item) for item in dict.fromkeys(tag_ids)]
         with self.db.transaction() as conn:
@@ -612,9 +712,18 @@ class ContactService:
             for contact_id in contact_ids:
                 for tag_id in tag_ids:
                     if conn.execute("SELECT 1 FROM tags WHERE id = ?", (tag_id,)).fetchone():
-                        conn.execute("INSERT OR IGNORE INTO contact_tags(contact_id, tag_id) VALUES (?, ?)", (contact_id, tag_id))
+                        conn.execute(
+                            "INSERT OR IGNORE INTO contact_tags(contact_id, tag_id) VALUES (?, ?)",
+                            (contact_id, tag_id),
+                        )
             if contact_ids:
-                self._record_event_locked(conn, None, "Contacts", "TAGGED", f"Updated tags for {len(contact_ids)} contact(s).")
+                self._record_event_locked(
+                    conn,
+                    None,
+                    "Contacts",
+                    "TAGGED",
+                    f"Updated tags for {len(contact_ids)} contact(s).",
+                )
 
     def create_tag_and_assign(self, name: str, contact_ids: Iterable[str]) -> Tag:
         tag = self.create_tag(name)
@@ -630,10 +739,15 @@ class ContactService:
                     tag_id = self._tag_id_locked(conn, name)
                     if tag_id:
                         before = conn.total_changes
-                        conn.execute("INSERT OR IGNORE INTO contact_tags(contact_id, tag_id) VALUES (?, ?)", (contact.id, tag_id))
+                        conn.execute(
+                            "INSERT OR IGNORE INTO contact_tags(contact_id, tag_id) VALUES (?, ?)",
+                            (contact.id, tag_id),
+                        )
                         if conn.total_changes > before:
                             assigned += 1
-            self._record_event_locked(conn, None, "Contacts", "AUTO_TAGGED", "Offline rules suggested tags for contacts.")
+            self._record_event_locked(
+                conn, None, "Contacts", "AUTO_TAGGED", "Offline rules suggested tags for contacts."
+            )
         return assigned
 
     # ── Recycle bin and duplicates ──────────────────────────────────────
@@ -656,7 +770,9 @@ class ContactService:
                     snapshot = json.loads(row["snapshot_json"])
                 except json.JSONDecodeError:
                     snapshot = {"name": row["name"]}
-                result.append(DeletedContact(row["contact_id"], row["name"], row["deleted_at"], snapshot))
+                result.append(
+                    DeletedContact(row["contact_id"], row["name"], row["deleted_at"], snapshot)
+                )
             return result
 
     def restore_deleted(self, contact_id: str) -> Contact:
@@ -672,32 +788,49 @@ class ContactService:
             except json.JSONDecodeError as exc:
                 raise ValueError("The saved contact copy is corrupted") from exc
             draft = self.draft_from_payload(snapshot)
-            restored_id = self._save_contact_locked(conn, draft, None, record_event=False, event_action="RESTORED")
+            restored_id = self._save_contact_locked(
+                conn, draft, None, record_event=False, event_action="RESTORED"
+            )
             conn.execute("DELETE FROM deleted_contacts WHERE contact_id = ?", (str(contact_id),))
-            self._record_event_locked(conn, restored_id, draft.name, "RESTORED", "Restored from Recycle Bin.")
+            self._record_event_locked(
+                conn, restored_id, draft.name, "RESTORED", "Restored from Recycle Bin."
+            )
             restored = self._get_contact_locked(conn, restored_id)
             assert restored is not None
             return restored
 
     def permanently_delete(self, contact_id: str) -> bool:
         with self.db.transaction() as conn:
-            row = conn.execute("SELECT name FROM deleted_contacts WHERE contact_id = ?", (str(contact_id),)).fetchone()
+            row = conn.execute(
+                "SELECT name FROM deleted_contacts WHERE contact_id = ?", (str(contact_id),)
+            ).fetchone()
             if not row:
                 return False
             conn.execute("DELETE FROM deleted_contacts WHERE contact_id = ?", (str(contact_id),))
-            self._record_event_locked(conn, str(contact_id), row["name"], "PURGED", "Removed permanently from Recycle Bin.")
+            self._record_event_locked(
+                conn,
+                str(contact_id),
+                row["name"],
+                "PURGED",
+                "Removed permanently from Recycle Bin.",
+            )
             return True
 
     def duplicate_groups(self) -> list[intelligence.DuplicateGroup]:
         return intelligence.find_duplicate_groups(self.list_contacts())
 
     def merge_contacts(self, target_id: str, source_ids: Iterable[str]) -> Contact:
-        source_ids = [str(item) for item in dict.fromkeys(source_ids) if str(item) != str(target_id)]
+        source_ids = [
+            str(item) for item in dict.fromkeys(source_ids) if str(item) != str(target_id)
+        ]
         with self.db.transaction() as conn:
             target = self._get_contact_locked(conn, str(target_id))
-            sources = [self._get_contact_locked(conn, item) for item in source_ids]
-            sources = [item for item in sources if item is not None]
-            if not target or not sources:
+            if target is None:
+                raise ValueError("Target contact not found")
+            sources: list[Contact] = [
+                c for sid in source_ids if (c := self._get_contact_locked(conn, sid)) is not None
+            ]
+            if not sources:
                 raise ValueError("Choose a target and at least one source contact")
 
             phone_values: list[PhoneNumber] = []
@@ -706,7 +839,8 @@ class ContactService:
             email_keys: set[str] = set()
             groups: list[str] = []
             tags: list[str] = []
-            for contact in [target, *sources]:
+            all_contacts = [target, *sources]
+            for contact in all_contacts:
                 for phone in contact.phones:
                     key = intelligence.normalize_phone(phone.number) or phone.number.casefold()
                     if key and key not in phone_keys:
@@ -727,18 +861,26 @@ class ContactService:
                 name=target.name or sources[0].name,
                 phones=phone_values,
                 emails=email_values,
-                company=target.company or next((item.company for item in sources if item.company), ""),
+                company=target.company
+                or next((item.company for item in sources if item.company), ""),
                 address=max((target.address, *(item.address for item in sources)), key=len),
-                note="\n".join(dict.fromkeys(item.note for item in [target, *sources] if item.note)),
+                note="\n".join(dict.fromkeys(item.note for item in all_contacts if item.note)),
                 groups=groups,
                 tags=tags,
-                is_favorite=any(item.is_favorite for item in [target, *sources]),
-                photo_uri=target.photo_uri or next((item.photo_uri for item in sources if item.photo_uri), None),
+                is_favorite=any(item.is_favorite for item in all_contacts),
+                photo_uri=target.photo_uri
+                or next((item.photo_uri for item in sources if item.photo_uri), None),
             )
             self._save_contact_locked(conn, draft, target.id, record_event=False)
             for source in sources:
                 conn.execute("DELETE FROM contacts WHERE id = ?", (source.id,))
-            self._record_event_locked(conn, target.id, target.name, "MERGED", f"Merged {len(sources)} duplicate contact(s).")
+            self._record_event_locked(
+                conn,
+                target.id,
+                target.name,
+                "MERGED",
+                f"Merged {len(sources)} duplicate contact(s).",
+            )
             merged = self._get_contact_locked(conn, target.id)
             assert merged is not None
             return merged
@@ -747,7 +889,9 @@ class ContactService:
 
     def favorite_contacts(self) -> list[Contact]:
         with self.db.lock:
-            rows = self.db.connection.execute("SELECT * FROM contacts WHERE is_favorite = 1 ORDER BY name COLLATE NOCASE").fetchall()
+            rows = self.db.connection.execute(
+                "SELECT * FROM contacts WHERE is_favorite = 1 ORDER BY name COLLATE NOCASE"
+            ).fetchall()
             return [self._row_to_contact(self.db.connection, row) for row in rows]
 
     def recent_contacts(self, limit: int = 100) -> list[Contact]:
@@ -766,7 +910,17 @@ class ContactService:
                 "FROM contact_events ORDER BY occurred_at DESC LIMIT ?",
                 (max(1, int(limit)),),
             ).fetchall()
-            return [Event(row["id"], row["contact_id"], row["contact_name"], row["action"], row["details"], row["occurred_at"]) for row in rows]
+            return [
+                Event(
+                    row["id"],
+                    row["contact_id"],
+                    row["contact_name"],
+                    row["action"],
+                    row["details"],
+                    row["occurred_at"],
+                )
+                for row in rows
+            ]
 
     def keyword_clusters(self) -> list[intelligence.KeywordCluster]:
         return intelligence.detect_keyword_clusters(self.list_contacts())
@@ -776,18 +930,25 @@ class ContactService:
             rows = self.db.connection.execute(
                 "SELECT id, name, field, value, created_at FROM smart_groups ORDER BY name COLLATE NOCASE"
             ).fetchall()
-            return [SmartGroup(row["id"], row["name"], row["field"], row["value"], row["created_at"]) for row in rows]
+            return [
+                SmartGroup(row["id"], row["name"], row["field"], row["value"], row["created_at"])
+                for row in rows
+            ]
 
     def create_smart_group(self, name: str, field: str, value: str) -> SmartGroup:
         if not name.strip() or not value.strip():
             raise ValueError("Smart group name and match value are required")
         with self.db.transaction() as conn:
-            item = SmartGroup(new_id("smart-"), name.strip(), field.strip().casefold(), value.strip(), now_ms())
+            item = SmartGroup(
+                new_id("smart-"), name.strip(), field.strip().casefold(), value.strip(), now_ms()
+            )
             conn.execute(
                 "INSERT INTO smart_groups(id, name, field, value, created_at) VALUES (?, ?, ?, ?, ?)",
                 (item.id, item.name, item.field, item.value, item.created_at),
             )
-            self._record_event_locked(conn, None, item.name, "SMART_GROUP_CREATED", f"Matches {item.field}: {item.value}")
+            self._record_event_locked(
+                conn, None, item.name, "SMART_GROUP_CREATED", f"Matches {item.field}: {item.value}"
+            )
             return item
 
     def delete_smart_group(self, smart_group_id: str) -> bool:
@@ -796,7 +957,11 @@ class ContactService:
             return cursor.rowcount > 0
 
     def smart_group_contacts(self, smart_group: SmartGroup) -> list[Contact]:
-        return [contact for contact in self.list_contacts() if intelligence.matches_smart_group(contact, smart_group.field, smart_group.value)]
+        return [
+            contact
+            for contact in self.list_contacts()
+            if intelligence.matches_smart_group(contact, smart_group.field, smart_group.value)
+        ]
 
     def relationships(self) -> list[tuple[str, list[str]]]:
         result: list[tuple[str, list[str]]] = []
@@ -821,7 +986,9 @@ class ContactService:
                 "contacts": conn.execute("SELECT COUNT(*) FROM contacts").fetchone()[0],
                 "groups": conn.execute("SELECT COUNT(*) FROM folders").fetchone()[0],
                 "tags": conn.execute("SELECT COUNT(*) FROM tags").fetchone()[0],
-                "favorites": conn.execute("SELECT COUNT(*) FROM contacts WHERE is_favorite = 1").fetchone()[0],
+                "favorites": conn.execute(
+                    "SELECT COUNT(*) FROM contacts WHERE is_favorite = 1"
+                ).fetchone()[0],
                 "trash": conn.execute("SELECT COUNT(*) FROM deleted_contacts").fetchone()[0],
             }
 
@@ -837,36 +1004,61 @@ class ContactService:
                     "SELECT id, name, parent_folder_id, created_at FROM folders ORDER BY name COLLATE NOCASE"
                 )
             ]
-            tags = [dict(row) for row in conn.execute("SELECT id, name FROM tags ORDER BY name COLLATE NOCASE")]
-            smart_groups = [dict(row) for row in conn.execute("SELECT id, name, field, value, created_at FROM smart_groups")]
+            tags = [
+                dict(row)
+                for row in conn.execute("SELECT id, name FROM tags ORDER BY name COLLATE NOCASE")
+            ]
+            smart_groups = [
+                dict(row)
+                for row in conn.execute(
+                    "SELECT id, name, field, value, created_at FROM smart_groups"
+                )
+            ]
             memberships = [
                 dict(row)
-                for row in conn.execute("SELECT contact_id, group_id AS folder_id FROM contact_groups")
+                for row in conn.execute(
+                    "SELECT contact_id, group_id AS folder_id FROM contact_groups"
+                )
             ]
             tag_assignments = [
-                dict(row)
-                for row in conn.execute("SELECT contact_id, tag_id FROM contact_tags")
+                dict(row) for row in conn.execute("SELECT contact_id, tag_id FROM contact_tags")
             ]
-            recent = [dict(row) for row in conn.execute("SELECT contact_id, viewed_at FROM recent_contacts")]
+            recent = [
+                dict(row)
+                for row in conn.execute("SELECT contact_id, viewed_at FROM recent_contacts")
+            ]
 
         phones: list[dict[str, Any]] = []
         emails: list[dict[str, Any]] = []
         contact_data: list[dict[str, Any]] = []
         for contact in contacts:
             item = self._contact_to_dict(contact)
-            item["folder_ids"] = [row["folder_id"] for row in memberships if row["contact_id"] == contact.id]
-            item["tag_ids"] = [row["tag_id"] for row in tag_assignments if row["contact_id"] == contact.id]
+            item["folder_ids"] = [
+                row["folder_id"] for row in memberships if row["contact_id"] == contact.id
+            ]
+            item["tag_ids"] = [
+                row["tag_id"] for row in tag_assignments if row["contact_id"] == contact.id
+            ]
             contact_data.append(item)
             for phone in contact.phones:
-                phones.append({
-                    "id": phone.id,
-                    "contact_id": contact.id,
-                    "label": phone.label,
-                    "number": phone.number,
-                    "normalised_number": intelligence.normalize_phone(phone.number),
-                })
+                phones.append(
+                    {
+                        "id": phone.id,
+                        "contact_id": contact.id,
+                        "label": phone.label,
+                        "number": phone.number,
+                        "normalised_number": intelligence.normalize_phone(phone.number),
+                    }
+                )
             for email in contact.emails:
-                emails.append({"id": email.id, "contact_id": contact.id, "label": email.label, "email": email.email})
+                emails.append(
+                    {
+                        "id": email.id,
+                        "contact_id": contact.id,
+                        "label": email.label,
+                        "email": email.email,
+                    }
+                )
 
         return {
             "format_version": 2,
@@ -914,11 +1106,15 @@ class ContactService:
         memberships_by_contact: dict[str, list[str]] = {}
         for item in data.get("memberships", []) or []:
             if isinstance(item, dict):
-                memberships_by_contact.setdefault(str(item.get("contact_id", "")), []).append(str(item.get("folder_id", "")))
+                memberships_by_contact.setdefault(str(item.get("contact_id", "")), []).append(
+                    str(item.get("folder_id", ""))
+                )
         tag_ids_by_contact: dict[str, list[str]] = {}
         for item in data.get("tag_assignments", []) or []:
             if isinstance(item, dict):
-                tag_ids_by_contact.setdefault(str(item.get("contact_id", "")), []).append(str(item.get("tag_id", "")))
+                tag_ids_by_contact.setdefault(str(item.get("contact_id", "")), []).append(
+                    str(item.get("tag_id", ""))
+                )
 
         imported = 0
         with self.db.transaction() as conn:
@@ -938,7 +1134,7 @@ class ContactService:
                 if not isinstance(item, dict):
                     continue
                 folder_id = str(item.get("id") or "")
-                name = folder_names.get(folder_id)
+                name = folder_names.get(folder_id, "")
                 if not name:
                     continue
                 parent = item.get("parent_folder_id")
@@ -953,7 +1149,9 @@ class ContactService:
                 tag_id = str(item.get("id") or new_id("tag-"))
                 name = str(item.get("name", "")).strip()
                 if name:
-                    conn.execute("INSERT OR IGNORE INTO tags(id, name) VALUES (?, ?)", (tag_id, name))
+                    conn.execute(
+                        "INSERT OR IGNORE INTO tags(id, name) VALUES (?, ?)", (tag_id, name)
+                    )
 
             imported_ids: dict[str, str] = {}
             for raw in data.get("contacts", []):
@@ -966,14 +1164,22 @@ class ContactService:
                 if not payload.get("emails") and emails_by_contact.get(source_id):
                     payload["emails"] = emails_by_contact[source_id]
                 if not payload.get("groups"):
-                    payload["groups"] = [folder_names[item] for item in memberships_by_contact.get(source_id, []) if item in folder_names]
+                    payload["groups"] = [
+                        folder_names[item]
+                        for item in memberships_by_contact.get(source_id, [])
+                        if item in folder_names
+                    ]
                 if not payload.get("tags"):
                     tag_names = {
                         str(item.get("id")): str(item.get("name", ""))
                         for item in tags_data
                         if isinstance(item, dict)
                     }
-                    payload["tags"] = [tag_names[item] for item in tag_ids_by_contact.get(source_id, []) if tag_names.get(item)]
+                    payload["tags"] = [
+                        tag_names[item]
+                        for item in tag_ids_by_contact.get(source_id, [])
+                        if tag_names.get(item)
+                    ]
                 draft = self.draft_from_payload(payload)
                 if not draft.name:
                     continue
@@ -986,10 +1192,22 @@ class ContactService:
             for item in data.get("memberships", []) or []:
                 if not isinstance(item, dict):
                     continue
-                contact_id = imported_ids.get(str(item.get("contact_id")), str(item.get("contact_id", "")))
+                contact_id = imported_ids.get(
+                    str(item.get("contact_id")), str(item.get("contact_id", ""))
+                )
                 group_id = str(item.get("folder_id", ""))
-                if contact_id and group_id and conn.execute("SELECT 1 FROM contacts WHERE id = ?", (contact_id,)).fetchone() and conn.execute("SELECT 1 FROM folders WHERE id = ?", (group_id,)).fetchone():
-                    conn.execute("INSERT OR IGNORE INTO contact_groups(contact_id, group_id) VALUES (?, ?)", (contact_id, group_id))
+                if (
+                    contact_id
+                    and group_id
+                    and conn.execute(
+                        "SELECT 1 FROM contacts WHERE id = ?", (contact_id,)
+                    ).fetchone()
+                    and conn.execute("SELECT 1 FROM folders WHERE id = ?", (group_id,)).fetchone()
+                ):
+                    conn.execute(
+                        "INSERT OR IGNORE INTO contact_groups(contact_id, group_id) VALUES (?, ?)",
+                        (contact_id, group_id),
+                    )
 
             for item in data.get("smart_groups", []) or data.get("smart_rules", []) or []:
                 if not isinstance(item, dict):
@@ -1000,15 +1218,28 @@ class ContactService:
                 if name and value:
                     conn.execute(
                         "INSERT OR REPLACE INTO smart_groups(id, name, field, value, created_at) VALUES (?, ?, ?, ?, ?)",
-                        (str(item.get("id") or new_id("smart-")), name, field, value, int(item.get("created_at") or now_ms())),
+                        (
+                            str(item.get("id") or new_id("smart-")),
+                            name,
+                            field,
+                            value,
+                            int(item.get("created_at") or now_ms()),
+                        ),
                     )
             if not conn.execute("SELECT 1 FROM folders LIMIT 1").fetchone():
                 for name in DEFAULT_GROUPS:
-                    conn.execute("INSERT INTO folders(id, name, parent_folder_id, created_at) VALUES (?, ?, NULL, ?)", (new_id("group-"), name, now_ms()))
-            self._record_event_locked(conn, None, "Vault", "RESTORED", f"Restored {imported} contacts from backup.")
+                    conn.execute(
+                        "INSERT INTO folders(id, name, parent_folder_id, created_at) VALUES (?, ?, NULL, ?)",
+                        (new_id("group-"), name, now_ms()),
+                    )
+            self._record_event_locked(
+                conn, None, "Vault", "RESTORED", f"Restored {imported} contacts from backup."
+            )
         return imported
 
-    def export_contacts_text(self, format_name: str, contact_ids: Iterable[str] | None = None, organized: bool = True) -> str:
+    def export_contacts_text(
+        self, format_name: str, contact_ids: Iterable[str] | None = None, organized: bool = True
+    ) -> str:
         contacts = self.list_contacts()
         if contact_ids is not None:
             selected = {str(item) for item in contact_ids}
@@ -1032,7 +1263,10 @@ class ContactService:
             with self.db.transaction() as conn:
                 self._clear_active_data_locked(conn)
                 for name in DEFAULT_GROUPS:
-                    conn.execute("INSERT INTO folders(id, name, parent_folder_id, created_at) VALUES (?, ?, NULL, ?)", (new_id("group-"), name, now_ms()))
+                    conn.execute(
+                        "INSERT INTO folders(id, name, parent_folder_id, created_at) VALUES (?, ?, NULL, ?)",
+                        (new_id("group-"), name, now_ms()),
+                    )
         count = 0
         for draft in drafts:
             self.save_contact(None, draft)

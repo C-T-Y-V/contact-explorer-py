@@ -62,20 +62,47 @@ class ContactExplorerHandler(BaseHTTPRequestHandler):
                 return self._send(200, self.service.stats())
             if parts == ["api", "contacts"]:
                 contacts = self.service.search_contacts(query.get("search", [""])[0])
-                return self._send(200, [_contact_json(self.service, contact) for contact in contacts])
+                return self._send(
+                    200, [_contact_json(self.service, contact) for contact in contacts]
+                )
             if len(parts) == 3 and parts[:2] == ["api", "contacts"]:
                 contact = self.service.get_contact(parts[2])
-                return self._send(200, _contact_json(self.service, contact) if contact else {"error": "Not found"}) if contact else self._send(404, {"error": "Contact not found"})
+                return (
+                    self._send(
+                        200,
+                        _contact_json(self.service, contact) if contact else {"error": "Not found"},
+                    )
+                    if contact
+                    else self._send(404, {"error": "Contact not found"})
+                )
             if parts == ["api", "groups"]:
                 return self._send(200, [group.to_dict() for group in self.service.list_groups()])
             if len(parts) == 4 and parts[:2] == ["api", "groups"] and parts[3] == "contacts":
-                return self._send(200, [_contact_json(self.service, contact) for contact in self.service.contacts_in_group(parts[2])])
+                return self._send(
+                    200,
+                    [
+                        _contact_json(self.service, contact)
+                        for contact in self.service.contacts_in_group(parts[2])
+                    ],
+                )
             if parts == ["api", "tags"]:
                 return self._send(200, [tag.to_dict() for tag in self.service.list_tags()])
             if parts == ["api", "favorites"]:
-                return self._send(200, [_contact_json(self.service, contact) for contact in self.service.favorite_contacts()])
+                return self._send(
+                    200,
+                    [
+                        _contact_json(self.service, contact)
+                        for contact in self.service.favorite_contacts()
+                    ],
+                )
             if parts == ["api", "recent"]:
-                return self._send(200, [_contact_json(self.service, contact) for contact in self.service.recent_contacts()])
+                return self._send(
+                    200,
+                    [
+                        _contact_json(self.service, contact)
+                        for contact in self.service.recent_contacts()
+                    ],
+                )
             if parts == ["api", "trash"]:
                 return self._send(200, [item.to_dict() for item in self.service.list_deleted()])
             if parts == ["api", "events"]:
@@ -88,7 +115,9 @@ class ContactExplorerHandler(BaseHTTPRequestHandler):
                     result.append(payload)
                 return self._send(200, result)
             if parts == ["api", "duplicates"]:
-                return self._send(200, [group.to_dict() for group in self.service.duplicate_groups()])
+                return self._send(
+                    200, [group.to_dict() for group in self.service.duplicate_groups()]
+                )
             if parts == ["api", "backup"] or parts == ["api", "vault"]:
                 return self._send(200, self.service.export_backup())
             return self._send(404, {"error": "Endpoint not found"})
@@ -105,12 +134,17 @@ class ContactExplorerHandler(BaseHTTPRequestHandler):
                 contact = self.service.save_contact(None, body)
                 return self._send(201, _contact_json(self.service, contact))
             if parts == ["api", "groups"]:
-                group = self.service.create_group(body.get("name", ""), body.get("parent_folder_id"))
+                group = self.service.create_group(
+                    body.get("name", ""), body.get("parent_folder_id")
+                )
                 return self._send(201, group.to_dict())
             if parts == ["api", "tags"]:
                 return self._send(201, self.service.create_tag(body.get("name", "")).to_dict())
             if parts == ["api", "backup"] or parts == ["api", "vault"]:
-                return self._send(200, {"imported": self.service.import_backup(body, bool(body.get("replace", True)))})
+                return self._send(
+                    200,
+                    {"imported": self.service.import_backup(body, bool(body.get("replace", True)))},
+                )
             if len(parts) == 3 and parts[:2] == ["api", "trash"] and parts[2] == "restore":
                 contact = self.service.restore_deleted(body.get("contact_id", ""))
                 return self._send(200, _contact_json(self.service, contact))
@@ -128,7 +162,9 @@ class ContactExplorerHandler(BaseHTTPRequestHandler):
                 contact = self.service.save_contact(parts[2], body)
                 return self._send(200, _contact_json(self.service, contact))
             if len(parts) == 3 and parts[:2] == ["api", "groups"]:
-                return self._send(200, self.service.rename_group(parts[2], body.get("name", "")).to_dict())
+                return self._send(
+                    200, self.service.rename_group(parts[2], body.get("name", "")).to_dict()
+                )
             return self._send(404, {"error": "Endpoint not found"})
         except (ValueError, json.JSONDecodeError) as exc:
             self._send(400, {"error": str(exc)})
@@ -138,7 +174,11 @@ class ContactExplorerHandler(BaseHTTPRequestHandler):
     def do_PATCH(self) -> None:
         try:
             parts, _ = self._parts()
-            if len(parts) == 4 and parts[:3] == ["api", "contacts", parts[2]] and parts[3] == "favorite":
+            if (
+                len(parts) == 4
+                and parts[:3] == ["api", "contacts", parts[2]]
+                and parts[3] == "favorite"
+            ):
                 return self._send(200, {"is_favorite": self.service.toggle_favorite(parts[2])})
             return self._send(404, {"error": "Endpoint not found"})
         except Exception as exc:  # pragma: no cover
@@ -160,9 +200,13 @@ class ContactExplorerHandler(BaseHTTPRequestHandler):
             self._send(400, {"error": str(exc)})
 
 
-def run_server(host: str = "127.0.0.1", port: int = 8765, db_path: str | Path | None = None) -> None:
+def run_server(
+    host: str = "127.0.0.1", port: int = 8765, db_path: str | Path | None = None
+) -> None:
     service = ContactService(db_path)
-    handler = type("ConfiguredContactExplorerHandler", (ContactExplorerHandler,), {"service": service})
+    handler = type(
+        "ConfiguredContactExplorerHandler", (ContactExplorerHandler,), {"service": service}
+    )
     server = ThreadingHTTPServer((host, port), handler)
     print(f"Contact Explorer backend running at http://{host}:{port}")
     print(f"SQLite database: {service.db_path}")

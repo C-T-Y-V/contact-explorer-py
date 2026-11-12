@@ -6,8 +6,8 @@ import csv
 import io
 import json
 import quopri
-import re
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from .models import Contact, ContactDraft, EmailAddress, PhoneNumber
 
@@ -17,7 +17,13 @@ def _escape_vcf(value: str) -> str:
 
 
 def _unescape_vcf(value: str) -> str:
-    return value.replace("\\n", "\n").replace("\\N", "\n").replace("\\,", ",").replace("\\;", ";").replace("\\\\", "\\")
+    return (
+        value.replace("\\n", "\n")
+        .replace("\\N", "\n")
+        .replace("\\,", ",")
+        .replace("\\;", ";")
+        .replace("\\\\", "\\")
+    )
 
 
 def to_csv(contacts: Iterable[Contact], include_organization: bool = True) -> str:
@@ -56,13 +62,15 @@ def from_csv(source: str) -> list[ContactDraft]:
         # Also accept a headerless six-column export.
         raw = list(csv.reader(io.StringIO(source)))
         rows = [
-            dict(zip(("name", "phone", "email", "company", "address", "notes"), row))
+            dict(zip(("name", "phone", "email", "company", "address", "notes"), row, strict=False))
             for row in raw
             if any(cell.strip() for cell in row)
         ]
     drafts: list[ContactDraft] = []
     for row in rows:
-        normalized = {str(key).strip().casefold(): (value or "").strip() for key, value in row.items()}
+        normalized = {
+            str(key).strip().casefold(): (value or "").strip() for key, value in row.items()
+        }
         name = normalized.get("name", "").strip()
         if not name:
             continue
@@ -87,7 +95,14 @@ def from_csv(source: str) -> list[ContactDraft]:
 def to_vcf(contacts: Iterable[Contact], include_organization: bool = True) -> str:
     lines: list[str] = []
     for contact in contacts:
-        lines.extend(("BEGIN:VCARD", "VERSION:3.0", f"FN:{_escape_vcf(contact.name)}", f"N:{_escape_vcf(contact.name)};;;;"))
+        lines.extend(
+            (
+                "BEGIN:VCARD",
+                "VERSION:3.0",
+                f"FN:{_escape_vcf(contact.name)}",
+                f"N:{_escape_vcf(contact.name)};;;;",
+            )
+        )
         for phone in contact.phones:
             label = phone.label.upper() or "CELL"
             lines.append(f"TEL;TYPE={label}:{_escape_vcf(phone.number)}")
@@ -170,7 +185,9 @@ def from_vcf(source: str) -> list[ContactDraft]:
                 card["phones"].append(PhoneNumber(value.strip(), label))
         elif key == "EMAIL":
             label = "Work" if "WORK" in params else "Home"
-            if value.strip() and value.strip().casefold() not in {email.email.casefold() for email in card["emails"]}:
+            if value.strip() and value.strip().casefold() not in {
+                email.email.casefold() for email in card["emails"]
+            }:
                 card["emails"].append(EmailAddress(value.strip(), label))
         elif key == "ORG" and not card.get("company"):
             card["company"] = value

@@ -29,9 +29,20 @@ def make_contact(
 
 
 def test_field_query_search() -> None:
-    c1 = make_contact("1", "Alice Smith", ["+1 555 1111"], ["alice@acme.com"], company="Acme", tags=["lead"])
-    c2 = make_contact("2", "Bob Jones", ["+1 555 2222"], ["bob@globex.com"], company="Globex", groups=["Sales"])
-    c3 = make_contact("3", "Charlie Brown", ["+1 555 3333"], ["charlie@acme.com"], company="Acme", is_favorite=True)
+    c1 = make_contact(
+        "1", "Alice Smith", ["+1 555 1111"], ["alice@acme.com"], company="Acme", tags=["lead"]
+    )
+    c2 = make_contact(
+        "2", "Bob Jones", ["+1 555 2222"], ["bob@globex.com"], company="Globex", groups=["Sales"]
+    )
+    c3 = make_contact(
+        "3",
+        "Charlie Brown",
+        ["+1 555 3333"],
+        ["charlie@acme.com"],
+        company="Acme",
+        is_favorite=True,
+    )
     contacts = [c1, c2, c3]
 
     # Search by company

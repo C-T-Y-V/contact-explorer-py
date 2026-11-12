@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from threading import RLock
-from typing import Iterator
-
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "contact_explorer.db"
 

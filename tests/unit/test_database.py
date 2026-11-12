@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sqlite3
 import threading
 from pathlib import Path
 
@@ -41,20 +40,17 @@ def test_transaction_commit_and_rollback(temp_db_path: Path) -> None:
     try:
         # Successful transaction
         with db.transaction():
-            db.connection.execute(
-                "INSERT INTO tags (id, name) VALUES (?, ?)", ("t-1", "test-tag")
-            )
+            db.connection.execute("INSERT INTO tags (id, name) VALUES (?, ?)", ("t-1", "test-tag"))
 
         row = db.connection.execute("SELECT name FROM tags WHERE id='t-1'").fetchone()
         assert row["name"] == "test-tag"
 
         # Failed transaction should roll back
-        with pytest.raises(ValueError):
-            with db.transaction():
-                db.connection.execute(
-                    "INSERT INTO tags (id, name) VALUES (?, ?)", ("t-2", "rollback-tag")
-                )
-                raise ValueError("Simulated operational failure")
+        with pytest.raises(ValueError), db.transaction():
+            db.connection.execute(
+                "INSERT INTO tags (id, name) VALUES (?, ?)", ("t-2", "rollback-tag")
+            )
+            raise ValueError("Simulated operational failure")
 
         row_rollback = db.connection.execute("SELECT name FROM tags WHERE id='t-2'").fetchone()
         assert row_rollback is None

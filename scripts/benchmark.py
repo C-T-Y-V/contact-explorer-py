@@ -51,7 +51,9 @@ def run_benchmark(count: int = 1000) -> None:
 
     # 2. Database File Size
     db_size_kb = db_path.stat().st_size / 1024
-    print(f"  [✓] Database size on disk: {db_size_kb:.1f} KB ({(db_size_kb / count):.2f} KB/contact)")
+    print(
+        f"  [✓] Database size on disk: {db_size_kb:.1f} KB ({(db_size_kb / count):.2f} KB/contact)"
+    )
 
     # 3. Search Query Benchmarks
     print("\n[*] Executing search performance queries...")
@@ -74,7 +76,9 @@ def run_benchmark(count: int = 1000) -> None:
     dup_start = time.perf_counter()
     duplicates = service.duplicate_groups()
     dup_elapsed = (time.perf_counter() - dup_start) * 1000
-    print(f"  [✓] Scanned {count:,} contacts for duplicates in {dup_elapsed:.2f} ms (Found {len(duplicates)} duplicate clusters)")
+    print(
+        f"  [✓] Scanned {count:,} contacts for duplicates in {dup_elapsed:.2f} ms (Found {len(duplicates)} duplicate clusters)"
+    )
 
     service.close()
     temp_dir.cleanup()

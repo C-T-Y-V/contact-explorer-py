@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from .models import Contact
 
@@ -89,7 +89,10 @@ def _field_values(contact: Contact) -> dict[str, list[str]]:
         "note": [contact.note.casefold()],
         "group": [value.casefold() for value in contact.groups],
         "tag": [value.casefold() for value in contact.tags],
-        "favorite": ["true" if contact.is_favorite else "false", "yes" if contact.is_favorite else "no"],
+        "favorite": [
+            "true" if contact.is_favorite else "false",
+            "yes" if contact.is_favorite else "no",
+        ],
         "is": ["favorite" if contact.is_favorite else "", "starred" if contact.is_favorite else ""],
     }
 
@@ -147,7 +150,9 @@ def _matches_filter(contact: Contact, field: str, value: str) -> bool:
     value = value.casefold()
     if key == "phone":
         digits = normalize_phone(value)
-        return any(value in phone or (digits and digits in normalize_phone(phone)) for phone in values)
+        return any(
+            value in phone or (digits and digits in normalize_phone(phone)) for phone in values
+        )
     return any(value in item for item in values)
 
 
@@ -182,14 +187,17 @@ def search_contacts(contacts: Iterable[Contact], query: str) -> list[Contact]:
             for value in searchable:
                 best = max(best, _relevance(term, value))
             if term_digits and len(term_digits) >= 3:
-                best = max(best, 110 if any(term_digits in normalize_phone(p) for p in _phones(contact)) else 0)
+                best = max(
+                    best,
+                    110 if any(term_digits in normalize_phone(p) for p in _phones(contact)) else 0,
+                )
             if not best:
                 break
             score += best
         else:
             # Favorites, recent access and call frequency provide a small,
             # deterministic tie-breaker like the Android search plugin.
-            score += (20 if contact.is_favorite else 0)
+            score += 20 if contact.is_favorite else 0
             score += min(contact.times_contacted, 50)
             ranked.append((score, contact))
 
@@ -203,7 +211,8 @@ def find_duplicate_groups(contacts: Iterable[Contact]) -> list[DuplicateGroup]:
     pair_scores: dict[tuple[str, str], tuple[int, str]] = {}
 
     def record(left: Contact, right: Contact, score: int, reason: str) -> None:
-        pair = tuple(sorted((left.id, right.id)))
+        s = sorted((left.id, right.id))
+        pair: tuple[str, str] = (s[0], s[1])
         if pair not in pair_scores or score > pair_scores[pair][0]:
             pair_scores[pair] = score, reason
 
@@ -234,21 +243,28 @@ def find_duplicate_groups(contacts: Iterable[Contact]) -> list[DuplicateGroup]:
         unique = list({contact.id: contact for contact in bucket}.values())
         for index, left in enumerate(unique):
             for right in unique[index + 1 :]:
-                same_company = bool(left.company and left.company.casefold() == right.company.casefold())
-                record(left, right, 85 if same_company else 75, "Same name and company" if same_company else "Identical name")
+                same_company = bool(
+                    left.company and left.company.casefold() == right.company.casefold()
+                )
+                record(
+                    left,
+                    right,
+                    85 if same_company else 75,
+                    "Same name and company" if same_company else "Identical name",
+                )
 
     adjacency: dict[str, set[str]] = {}
     reasons: dict[str, str] = {}
     confidence: dict[str, int] = {}
-    for (left, right), (score, reason) in pair_scores.items():
+    for (lid, rid), (score, reason) in pair_scores.items():
         if score < 60:
             continue
-        adjacency.setdefault(left, set()).add(right)
-        adjacency.setdefault(right, set()).add(left)
-        reasons[left] = reason
-        reasons[right] = reason
-        confidence[left] = max(confidence.get(left, 0), score)
-        confidence[right] = max(confidence.get(right, 0), score)
+        adjacency.setdefault(lid, set()).add(rid)
+        adjacency.setdefault(rid, set()).add(lid)
+        reasons[lid] = reason
+        reasons[rid] = reason
+        confidence[lid] = max(confidence.get(lid, 0), score)
+        confidence[rid] = max(confidence.get(rid, 0), score)
 
     result: list[DuplicateGroup] = []
     visited: set[str] = set()
@@ -280,7 +296,9 @@ def find_duplicate_groups(contacts: Iterable[Contact]) -> list[DuplicateGroup]:
 def suggested_tags(contact: Contact) -> set[str]:
     phones = " ".join(_phones(contact))
     emails = " ".join(_emails(contact))
-    text = " ".join((contact.name, contact.company, emails, contact.address, contact.note, phones)).casefold()
+    text = " ".join(
+        (contact.name, contact.company, emails, contact.address, contact.note, phones)
+    ).casefold()
     rules = {
         "developer": ("developer", "engineer", "software", "programmer"),
         "college": ("college", "university", "student", "campus"),
@@ -303,28 +321,110 @@ def detect_keyword_clusters(contacts: Iterable[Contact]) -> list[KeywordCluster]
     contacts = list(contacts)
     rules = [
         ("Legal & Advocates", ("adv", "advocate", "lawyer", "legal", "vakil")),
-        ("Class & College", ("class", "classmate", "college", "school", "batch", "batchmate", "tuition", "coaching", "academy")),
+        (
+            "Class & College",
+            (
+                "class",
+                "classmate",
+                "college",
+                "school",
+                "batch",
+                "batchmate",
+                "tuition",
+                "coaching",
+                "academy",
+            ),
+        ),
         ("Medical & Doctors", ("dr", "doctor", "doc", "clinic", "dentist", "pharma", "hospital")),
-        ("Services & Home", ("plumber", "electrician", "carpenter", "driver", "mechanic", "maid", "cook", "painter")),
-        ("Real Estate", ("flat", "broker", "dealer", "agent", "realtor", "property", "builder", "rent")),
+        (
+            "Services & Home",
+            (
+                "plumber",
+                "electrician",
+                "carpenter",
+                "driver",
+                "mechanic",
+                "maid",
+                "cook",
+                "painter",
+            ),
+        ),
+        (
+            "Real Estate",
+            ("flat", "broker", "dealer", "agent", "realtor", "property", "builder", "rent"),
+        ),
         ("Gym & Fitness", ("gym", "fitness", "trainer", "coach", "workout", "yoga")),
-        ("Corporate & Work", ("office", "work", "corp", "manager", "boss", "client", "vendor", "tcs", "wipro", "infosys", "accenture")),
-        ("Family", ("mom", "dad", "mother", "father", "bhai", "sister", "brother", "chacha", "mama", "uncle", "aunty")),
+        (
+            "Corporate & Work",
+            (
+                "office",
+                "work",
+                "corp",
+                "manager",
+                "boss",
+                "client",
+                "vendor",
+                "tcs",
+                "wipro",
+                "infosys",
+                "accenture",
+            ),
+        ),
+        (
+            "Family",
+            (
+                "mom",
+                "dad",
+                "mother",
+                "father",
+                "bhai",
+                "sister",
+                "brother",
+                "chacha",
+                "mama",
+                "uncle",
+                "aunty",
+            ),
+        ),
     ]
     clusters: list[KeywordCluster] = []
     for category, keywords in rules:
         matching = [
             contact
             for contact in contacts
-            if any(keyword in tokens(f"{contact.name} {contact.company} {contact.note}") for keyword in keywords)
+            if any(
+                keyword in tokens(f"{contact.name} {contact.company} {contact.note}")
+                for keyword in keywords
+            )
         ]
         if len(matching) >= 2:
             clusters.append(KeywordCluster(keywords[0], category, matching))
 
     stop_words = {
-        "the", "and", "mr", "mrs", "shri", "kumar", "singh", "sharma", "patel",
-        "gupta", "verma", "reddy", "rao", "contact", "new", "home", "cell",
-        "work", "call", "test", "sim", "airtel", "jio", "phone",
+        "the",
+        "and",
+        "mr",
+        "mrs",
+        "shri",
+        "kumar",
+        "singh",
+        "sharma",
+        "patel",
+        "gupta",
+        "verma",
+        "reddy",
+        "rao",
+        "contact",
+        "new",
+        "home",
+        "cell",
+        "work",
+        "call",
+        "test",
+        "sim",
+        "airtel",
+        "jio",
+        "phone",
     }
     token_map: dict[str, list[Contact]] = {}
     for contact in contacts:
@@ -333,10 +433,14 @@ def detect_keyword_clusters(contacts: Iterable[Contact]) -> list[KeywordCluster]
                 token_map.setdefault(token, []).append(contact)
     for keyword, members in token_map.items():
         member_ids = {item.id for item in members}
-        if len(members) < 2 or any(member_ids.issubset({item.id for item in cluster.contacts}) for cluster in clusters):
+        if len(members) < 2 or any(
+            member_ids.issubset({item.id for item in cluster.contacts}) for cluster in clusters
+        ):
             continue
         pretty = keyword[:1].upper() + keyword[1:]
-        if not any(cluster.suggested_category.casefold() == pretty.casefold() for cluster in clusters):
+        if not any(
+            cluster.suggested_category.casefold() == pretty.casefold() for cluster in clusters
+        ):
             clusters.append(KeywordCluster(keyword, pretty, members))
     return sorted(clusters, key=lambda cluster: -len(cluster.contacts))
 

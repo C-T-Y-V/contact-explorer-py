@@ -29,7 +29,10 @@ DEMO_CONTACTS = [
     ContactDraft(
         name="Diya Sengupta",
         phones=[PhoneNumber("+91 98300 44556", "Mobile")],
-        emails=[EmailAddress("diya.s@designstudio.org", "Work"), EmailAddress("diya@gmail.com", "Personal")],
+        emails=[
+            EmailAddress("diya.s@designstudio.org", "Work"),
+            EmailAddress("diya@gmail.com", "Personal"),
+        ],
         company="Studio Pixel Works",
         address="Park Street, Kolkata, West Bengal",
         note="Principal Product Designer. Specializes in dark-mode UI systems.",
@@ -88,11 +91,11 @@ def seed(db_path: Path | None = None) -> None:
     service = ContactService(db_path)
     print(f"[*] Initialized database connection: {service.db.path}")
 
-    created = 0
-    for draft in DEMO_CONTACTS:
+    for created, draft in enumerate(DEMO_CONTACTS, 1):
         contact = service.save_contact(None, draft)
-        created += 1
-        print(f"  [+] Created contact: {contact.name} ({contact.primary_phone or contact.primary_email})")
+        print(
+            f"  [+] Created contact #{created}: {contact.name} ({contact.primary_phone or contact.primary_email})"
+        )
 
     stats = service.stats()
     dup_clusters = len(service.duplicate_groups())

@@ -66,11 +66,15 @@ def test_service_soft_delete_and_restore(service: ContactService) -> None:
 def test_service_merge_contacts(service: ContactService) -> None:
     primary = service.save_contact(
         None,
-        ContactDraft("Primary User", [PhoneNumber("1111111111")], [EmailAddress("primary@test.com")]),
+        ContactDraft(
+            "Primary User", [PhoneNumber("1111111111")], [EmailAddress("primary@test.com")]
+        ),
     )
     secondary = service.save_contact(
         None,
-        ContactDraft("Secondary User", [PhoneNumber("2222222222")], [EmailAddress("secondary@test.com")]),
+        ContactDraft(
+            "Secondary User", [PhoneNumber("2222222222")], [EmailAddress("secondary@test.com")]
+        ),
     )
 
     merged = service.merge_contacts(primary.id, [secondary.id])
