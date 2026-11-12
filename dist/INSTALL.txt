@@ -1,0 +1,21 @@
+Contact Explorer Android APK
+
+File: ContactExplorer-Android.apk
+
+Install on phone:
+1. Copy the APK to your Android phone.
+2. Open it from Files/Downloads.
+3. Allow "Install unknown apps" if Android asks.
+4. Install and open Contact Explorer.
+5. Grant Contacts permission when prompted to read or edit phone contacts.
+
+Build details:
+- Application: Contact Explorer
+- Version: 6.0 (versionCode 6)
+- Minimum Android: API 26 / Android 8.0
+- Target Android: API 35
+- SHA-256: 01B65422CB3343B09945E8BF7BF414CF14D4B77E96620599E4A7C5D136A68B1
+
+Note: Tkinter is a desktop-only UI toolkit and cannot run directly inside an
+Android APK. This APK is the Android-compatible native build of the Contact
+Explorer feature set; the Python/Tkinter project remains available for Windows.

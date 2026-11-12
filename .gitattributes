@@ -1,0 +1,31 @@
+# Set default behavior to automatically normalize line endings
+* text=auto eol=lf
+
+# Explicit text files with LF line endings
+*.py        text diff=python eol=lf
+*.toml      text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.txt       text eol=lf
+*.sh        text eol=lf
+*.ini       text eol=lf
+*.cfg       text eol=lf
+Makefile    text eol=lf
+
+# Windows shell batch scripts must retain CRLF
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# Binary files
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.db        binary
+*.sqlite3   binary
+*.apk       binary
+*.zip       binary

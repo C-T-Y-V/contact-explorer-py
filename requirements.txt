@@ -1,0 +1,8 @@
+# Contact Explorer Production Dependencies
+# ----------------------------------------------------
+# Contact Explorer is built exclusively on Python's Standard Library
+# (sqlite3, tkinter, dataclasses, http.server, json, csv, etc.).
+# Zero external runtime dependencies required.
+#
+# Note: For desktop GUI, ensure Python is installed with Tkinter support
+# (included by default on Windows/macOS python.org installers).
