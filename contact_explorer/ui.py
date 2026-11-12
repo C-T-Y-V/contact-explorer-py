@@ -47,7 +47,7 @@ class ContactExplorerApp(tk.Tk):
     def __init__(self, db_path: str | Path | None = None) -> None:
         super().__init__()
         self.service = ContactService(db_path)
-        self.title("Contact Explorer — Python Edition")
+        self.title("Contact Explorer — Python Edition (A CTYV Product)")
         self.geometry("1320x820")
         self.minsize(1000, 650)
         self.configure(bg=COLORS["bg"])
@@ -136,6 +136,13 @@ class ContactExplorerApp(tk.Tk):
             fg=COLORS["cyan"],
             font=("Segoe UI", 20, "bold"),
         ).pack(anchor="w")
+        tk.Label(
+            brand,
+            text="A CTYV PRODUCT",
+            bg=COLORS["panel"],
+            fg="#f59e0b",
+            font=("Segoe UI", 7, "bold"),
+        ).pack(anchor="w", pady=(1, 0))
 
         search_frame = tk.Frame(
             header, bg=COLORS["panel_alt"], highlightbackground=COLORS["line"], highlightthickness=1

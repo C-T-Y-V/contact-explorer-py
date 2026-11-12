@@ -8,9 +8,9 @@ version = "1.0.0"
 description = "Enterprise-grade, privacy-first offline contact explorer and management suite"
 readme = "README.md"
 authors = [
-    { name = "Contact Explorer Core Team", email = "priyanshuctyv@gmail.com" }
+    { name = "Priyanshu Sharma (CTYV)", email = "priyanshuctyv@gmail.com" }
 ]
-license = { text = "MIT" }
+license = { text = "MIT with Attribution" }
 requires-python = ">=3.10"
 keywords = [
     "contacts",

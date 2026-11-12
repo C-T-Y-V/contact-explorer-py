@@ -20,8 +20,8 @@ from .models import (
 from .service import ContactService
 
 __version__ = "1.0.0"
-__author__ = "Contact Explorer Core Team"
-__license__ = "MIT"
+__author__ = "Priyanshu Sharma (CTYV) — A CTYV Product"
+__license__ = "MIT with Attribution"
 
 __all__ = [
     "Contact",

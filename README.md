@@ -2,10 +2,12 @@
 
 # Contact Explorer — Python Edition
 
-### *Enterprise-Grade, Offline-First Contact Management & Intelligence Engine*
+### **A CTYV PRODUCT**
+*Enterprise-Grade, Offline-First Contact Management & Intelligence Engine*
 
+[![Product: CTYV](https://img.shields.io/badge/Product-CTYV-orange.svg?style=flat&logo=github)](https://github.com/C-T-Y-V)
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT%20with%20Attribution-yellow.svg)](LICENSE)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg?logo=github-actions&logoColor=white)](.github/workflows/ci.yml)
 [![Security: CodeQL](https://img.shields.io/badge/Security-CodeQL%20Passed-blueviolet.svg?logo=github)](.github/workflows/codeql.yml)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg?logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff)
@@ -250,6 +252,8 @@ To report security concerns, please consult our [Security Policy](SECURITY.md).
 
 ## 📄 License & Attribution
 
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for complete details.
+Distributed under the **MIT License (with Attribution)**. See [`LICENSE`](LICENSE) for complete details.
 
-Copyright © 2026 **Contact Explorer Authors & Contributors**.
+Copyright © 2026 **Priyanshu Sharma (CTYV) — A CTYV Product**. All rights reserved.
+
+> **Attribution Note:** Derivative works, forks, and redistributions utilizing this software are requested and required to retain credit stating: *"A CTYV Product"* or *"Inspired by A CTYV Product"*.
